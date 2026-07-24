@@ -36,6 +36,7 @@ export function createDesktopHost(): DesktopHost {
   const transport = createIpcTransport();
   const desktopApi = new DesktopApi(transport);
   const applicationClient = createClient(ApplicationService, transport);
+  let configSchemaPromise: Promise<string> | null = null;
   const preferenceValues = { ...bridge.preferences.initial };
   const preferenceListeners = new Set<(name: string) => void>();
 
@@ -121,6 +122,17 @@ export function createDesktopHost(): DesktopHost {
         await applicationClient.checkConfig({ content });
       },
       format: async (content) => (await applicationClient.formatConfig({ content })).content,
+      generateSchema: () => {
+        if (configSchemaPromise === null) {
+          configSchemaPromise = applicationClient
+            .generateConfigSchema({})
+            .then((result) => result.content);
+          configSchemaPromise.catch(() => {
+            configSchemaPromise = null;
+          });
+        }
+        return configSchemaPromise;
+      },
     },
     tools: {
       startStandaloneNetworkQualityTest: (request, options) =>
