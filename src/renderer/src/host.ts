@@ -63,7 +63,7 @@ export function createDesktopHost(): DesktopHost {
     appVersion: () => bridge.app.version(),
     transport,
     preferences: {
-      get: (name) => preferenceValues[name],
+      get: (name) => structuredClone(preferenceValues[name]),
       set: (name, value) => {
         preferenceValues[name] = value;
         void bridge.preferences.set(name, value).catch(showError);
