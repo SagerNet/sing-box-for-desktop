@@ -58,6 +58,8 @@ win:
       to: daemon
       filter:
         - libcronet.dll
+        - WinDivert64.sys
+        - WinDivert32.sys
     - from: bin/windows/${arch}/windows_share.node
       to: native/windows_share.node
   target:

@@ -328,6 +328,7 @@ const windowsArchitectures = [
     artifactArchitecture: "x64",
     portableExecutableMachine: 0x8664,
     includesCronet: true,
+    winDivertDriver: "WinDivert64.sys",
   },
   {
     goArchitecture: "386",
@@ -336,6 +337,7 @@ const windowsArchitectures = [
     artifactArchitecture: "x86",
     portableExecutableMachine: 0x014c,
     includesCronet: false,
+    winDivertDriver: "WinDivert32.sys",
   },
   {
     goArchitecture: "arm64",
@@ -344,6 +346,7 @@ const windowsArchitectures = [
     artifactArchitecture: "arm64",
     portableExecutableMachine: 0xaa64,
     includesCronet: true,
+    winDivertDriver: null,
   },
 ] as const;
 
@@ -357,6 +360,9 @@ async function packageWindowsArchitecture(artifactArchitecture: string) {
   const stagedPaths = ["sing-box-daemon.exe", "windows_share.node"];
   if (architecture.includesCronet) {
     stagedPaths.push("libcronet.dll");
+  }
+  if (architecture.winDivertDriver !== null) {
+    stagedPaths.push(architecture.winDivertDriver);
   }
   for (const stagedPath of stagedPaths) {
     verifyPortableExecutableArchitecture(
