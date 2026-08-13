@@ -57,20 +57,20 @@ class StatusNotifierItem extends dbus.interface.Interface {
   readonly Menu = "/NO_DBUSMENU";
   readonly ItemIsMenu = false;
 
-  constructor(private readonly activate: () => void) {
+  constructor(private readonly activate: (x: number, y: number) => void) {
     super(STATUS_NOTIFIER_ITEM_INTERFACE);
   }
 
-  ContextMenu(_x: number, _y: number) {
-    this.activate();
+  ContextMenu(x: number, y: number) {
+    this.activate(x, y);
   }
 
-  Activate(_x: number, _y: number) {
-    this.activate();
+  Activate(x: number, y: number) {
+    this.activate(x, y);
   }
 
-  SecondaryActivate(_x: number, _y: number) {
-    this.activate();
+  SecondaryActivate(x: number, y: number) {
+    this.activate(x, y);
   }
 
   Scroll(_delta: number, _orientation: string) {}
@@ -139,7 +139,7 @@ export class X11Tray {
   private readonly item: StatusNotifierItem;
   private destroyed = false;
 
-  constructor(activate: () => void) {
+  constructor(activate: (x: number, y: number) => void) {
     this.item = new StatusNotifierItem(activate);
     this.bus.export(STATUS_NOTIFIER_ITEM_PATH, this.item);
     this.bus.on("error", (error: unknown) => {

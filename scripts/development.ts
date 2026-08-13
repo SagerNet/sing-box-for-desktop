@@ -92,6 +92,11 @@ async function ensureWindowsShareModule() {
 
 function startApplication(socketPath: string): ChildProcess {
   const electronArguments = [`--daemon-socket=${socketPath}`];
+  // electron-vite exits and tears down the process group when the instance it
+  // spawned exits, so the relaunch in src/main/index.ts cannot survive it.
+  if (process.platform === "linux" && process.env.DISPLAY !== undefined) {
+    electronArguments.push("--ozone-platform=x11");
+  }
   if (commandLine["user-data"]) {
     electronArguments.push(`--user-data=${commandLine["user-data"]}`);
   }

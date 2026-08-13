@@ -17,29 +17,39 @@ let tray: Tray | null = null;
 let x11Tray: X11Tray | null = null;
 let openWindow: () => void = () => {};
 
-function usesX11Tray(): boolean {
-  if (process.platform !== "linux") {
-    return false;
-  }
-  const ozonePlatform = app.commandLine.getSwitchValue("ozone-platform");
-  if (ozonePlatform === "x11") {
-    return true;
-  }
-  if (ozonePlatform === "wayland") {
-    return false;
-  }
-  const sessionType = process.env.XDG_SESSION_TYPE?.toLowerCase() ?? "";
-  return (
-    sessionType === "x11" ||
-    (sessionType === "" &&
-      process.env.DISPLAY !== undefined &&
-      process.env.WAYLAND_DISPLAY === undefined)
-  );
-}
-
 function cursorAnchor(): Rectangle {
   const cursor = screen.getCursorScreenPoint();
   return { x: cursor.x, y: cursor.y, width: 0, height: 0 };
+}
+
+// Plasma's system tray sends the icon position, not the cursor position, in
+// ContextMenu/Activate/SecondaryActivate, and it does so in Wayland sessions
+// too — where the cursor position read through XWayland is stale. On X11 the
+// coordinates are device pixels while Chromium's screen space is DIPs; in
+// Wayland sessions plasmashell sends logical coordinates, which match
+// Chromium's DIP space in both XWayland scaling modes. Other SNI hosts send
+// (0, 0) or coordinates outside any display.
+function clickAnchor(clickX: number, clickY: number): Rectangle {
+  let x = clickX;
+  let y = clickY;
+  if (process.env.XDG_SESSION_TYPE?.toLowerCase() !== "wayland") {
+    const scaleFactor = screen.getPrimaryDisplay().scaleFactor;
+    x = Math.round(x / scaleFactor);
+    y = Math.round(y / scaleFactor);
+  }
+  const insideDisplay = screen.getAllDisplays().some((display) => {
+    const bounds = display.bounds;
+    return (
+      x >= bounds.x &&
+      x < bounds.x + bounds.width &&
+      y >= bounds.y &&
+      y < bounds.y + bounds.height
+    );
+  });
+  if ((clickX === 0 && clickY === 0) || !insideDisplay) {
+    return cursorAnchor();
+  }
+  return { x, y, width: 0, height: 0 };
 }
 
 function translate(key: DesktopMessageKey): string {
@@ -190,15 +200,18 @@ export function updateTrayVisibility(enabled: boolean) {
   if (tray !== null || x11Tray !== null) {
     return;
   }
-  if (!usesX11Tray()) {
+  // Electron resolves the ozone platform before the main script runs and
+  // appends the result to its command line, so the switch value reports the
+  // platform actually in use even when nothing was passed.
+  if (process.platform !== "linux" || app.commandLine.getSwitchValue("ozone-platform") !== "x11") {
     createElectronTray();
     return;
   }
   prepareTrayMenuWindow(cursorAnchor());
   let currentTray: X11Tray;
   try {
-    currentTray = new X11Tray(() => {
-      void showTrayMenu(cursorAnchor());
+    currentTray = new X11Tray((x, y) => {
+      void showTrayMenu(clickAnchor(x, y));
     });
   } catch (error: unknown) {
     console.error("failed to create X11 tray:", error);

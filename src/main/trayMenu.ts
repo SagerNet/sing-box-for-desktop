@@ -33,7 +33,14 @@ function ensureTrayMenuWindow(initialBounds: Rectangle): BrowserWindow {
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    focusable: false,
+    // Chromium creates a window that is not focusable at creation time as an
+    // override-redirect window on X11, which the window manager never manages:
+    // it stays unfocusable for the rest of its life, so blur is never
+    // delivered, and its stacking order is out of the compositor's hands.
+    // setSkipTaskbar does nothing on Linux, so the taskbar entry a focusable
+    // window would get is avoided through the window type instead.
+    focusable: process.platform === "linux",
+    type: process.platform === "linux" ? "toolbar" : undefined,
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.cjs"),
       contextIsolation: true,

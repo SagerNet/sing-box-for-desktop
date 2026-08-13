@@ -21,6 +21,7 @@ import { registerDaemonBridge } from "./bridge";
 import { registerCore } from "./core";
 import { settingsDatabase } from "./database";
 import { developmentRendererURL, developmentSwitchValue } from "./development";
+import { applyDisplayScaleFactor } from "./displayScale";
 import { hasLoginItemArgument, migrateLoginItem, wasOpenedAtLogin } from "./loginItem";
 import { registerPreferences } from "./preferences";
 import { registerOpenConnectBrowser } from "./openConnectBrowser";
@@ -76,6 +77,25 @@ function handleFatal(kind: string, error: unknown): never {
 }
 process.on("uncaughtException", (error) => handleFatal("uncaughtException", error));
 process.on("unhandledRejection", (reason) => handleFatal("unhandledRejection", reason));
+
+// Electron selects native Wayland when WAYLAND_DISPLAY is set, where the
+// custom tray menu window cannot be positioned; under XWayland it can. Ozone
+// is initialized before the main script runs and the resolved platform is
+// appended to the command line, so appendSwitch cannot change it anymore.
+if (
+  process.platform === "linux" &&
+  process.env.DISPLAY !== undefined &&
+  app.commandLine.getSwitchValue("ozone-platform") === "wayland" &&
+  !process.argv.some((argument) => argument.startsWith("--ozone-platform")) &&
+  process.env.ELECTRON_OZONE_PLATFORM_HINT === undefined
+) {
+  app.relaunch({ args: process.argv.slice(1).concat("--ozone-platform=x11") });
+  app.exit(0);
+}
+
+if (process.platform === "linux" && app.commandLine.getSwitchValue("ozone-platform") === "x11") {
+  applyDisplayScaleFactor();
+}
 
 configureApplicationPaths(developmentSwitchValue("user-data"));
 
