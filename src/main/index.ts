@@ -4,12 +4,19 @@ import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import {
+  APP_NAVIGATE,
   APP_TITLE_BAR_OVERLAY,
   DEEP_LINK_IMPORT,
   PROFILE_FILE_IMPORT,
+  TAILDROP_SEND_REQUEST,
   UPDATES_PRESENT,
 } from "../shared/ipc";
-import type { DeepLinkImport, ProfileFileImport, TitleBarOverlayColors } from "../shared/ipc";
+import type {
+  DeepLinkImport,
+  ProfileFileImport,
+  TaildropSendFile,
+  TitleBarOverlayColors,
+} from "../shared/ipc";
 import { configureApplicationPaths } from "./applicationPaths";
 import {
   archiveNativeCrashDumps,
@@ -23,6 +30,7 @@ import { settingsDatabase } from "./database";
 import { developmentRendererURL, developmentSwitchValue } from "./development";
 import { applyDisplayScaleFactor } from "./displayScale";
 import { hasLoginItemArgument, migrateLoginItem, wasOpenedAtLogin } from "./loginItem";
+import { registerNotifications } from "./notifications";
 import { registerPreferences } from "./preferences";
 import { registerOpenConnectBrowser } from "./openConnectBrowser";
 import { registerProfileEditorWindows } from "./profileEditorWindows";
@@ -39,6 +47,7 @@ import {
   trayInBackground,
 } from "./settings";
 import { daemonState } from "./state";
+import { createTaildropSendBatcher, registerTaildrop, taildropSendPaths } from "./taildrop";
 import { initializeTray, updateTrayVisibility } from "./tray";
 import { registerUpdates, runStartupUpdateCheck } from "./updates";
 import { prepareTrayMenuWindow, showTrayMenu } from "./trayMenu";
@@ -271,14 +280,29 @@ function showWindow(): BrowserWindow {
   return createWindow();
 }
 
-function parseImportLink(link: string): DeepLinkImport | null {
+function parseDeepLink(link: string): URL | null {
   let parsed: URL;
   try {
     parsed = new URL(link);
   } catch {
     return null;
   }
-  if (parsed.protocol !== "sing-box:" || parsed.host !== "import-remote-profile") {
+  if (parsed.protocol !== "sing-box:") {
+    return null;
+  }
+  if (parsed.host !== "") {
+    return parsed;
+  }
+  try {
+    return new URL(`sing-box://${parsed.pathname}${parsed.search}${parsed.hash}`);
+  } catch {
+    return null;
+  }
+}
+
+function parseImportLink(link: string): DeepLinkImport | null {
+  const parsed = parseDeepLink(link);
+  if (parsed === null || parsed.host !== "import-remote-profile") {
     return null;
   }
   const remoteUrl = parsed.searchParams.get("url");
@@ -320,6 +344,37 @@ function handleDeepLink(link: string) {
   sendWhenLoaded(DEEP_LINK_IMPORT, request);
 }
 
+function notificationRoute(parsed: URL): string | null {
+  if (parsed.host !== "taildrop") {
+    return null;
+  }
+  const endpointTag = parsed.searchParams.get("endpoint");
+  if (!endpointTag) {
+    return null;
+  }
+  return `tools/tailscale/${encodeURIComponent(endpointTag)}/taildrop`;
+}
+
+function handleNotificationOpen(openURL: string) {
+  const deepLink = parseDeepLink(openURL);
+  if (deepLink !== null) {
+    const route = notificationRoute(deepLink);
+    if (route !== null) {
+      sendWhenLoaded(APP_NAVIGATE, route);
+    }
+    return;
+  }
+  let external: URL;
+  try {
+    external = new URL(openURL);
+  } catch {
+    return;
+  }
+  if (external.protocol === "http:" || external.protocol === "https:") {
+    void shell.openExternal(openURL);
+  }
+}
+
 function handleProfileFile(path: string) {
   void readFile(path).then(
     (data) => {
@@ -331,6 +386,24 @@ function handleProfileFile(path: string) {
     () => {},
   );
 }
+
+const TAILDROP_SEND_REQUEST_LIFETIME = 60_000;
+
+function deliverTaildropSend(files: TaildropSendFile[]) {
+  const window = showWindow();
+  if (!window.webContents.isLoading()) {
+    window.webContents.send(TAILDROP_SEND_REQUEST, files);
+    return;
+  }
+  const deadline = Date.now() + TAILDROP_SEND_REQUEST_LIFETIME;
+  window.webContents.once("did-finish-load", () => {
+    if (Date.now() <= deadline) {
+      window.webContents.send(TAILDROP_SEND_REQUEST, files);
+    }
+  });
+}
+
+const queueTaildropSend = createTaildropSendBatcher(deliverTaildropSend);
 
 function deepLinkFromArguments(argv: string[]): string | undefined {
   return argv.find((argument) => argument.startsWith("sing-box://"));
@@ -345,11 +418,15 @@ if (!singleInstanceLock) {
   app.quit();
 } else {
   app.setAsDefaultProtocolClient("sing-box");
+  if (process.platform === "win32") {
+    app.setAppUserModelId("io.nekohasekai.sfw");
+  }
 
-  app.on("second-instance", (_event, argv) => {
+  app.on("second-instance", (_event, argv, workingDirectory) => {
     const link = deepLinkFromArguments(argv);
     const profileFile = profileFileFromArguments(argv);
-    if (!hasLoginItemArgument(argv) || link || profileFile) {
+    const taildropPaths = taildropSendPaths(argv, workingDirectory);
+    if (!hasLoginItemArgument(argv) || link || profileFile || taildropPaths.length > 0) {
       showWindow();
     }
     if (link) {
@@ -358,6 +435,7 @@ if (!singleInstanceLock) {
     if (profileFile) {
       handleProfileFile(profileFile);
     }
+    queueTaildropSend(taildropPaths);
   });
 
   app.on("open-url", (event, url) => {
@@ -408,11 +486,19 @@ if (!singleInstanceLock) {
     registerProfiles();
     registerServers();
     registerSettings(updateTrayVisibility);
+    registerTaildrop();
+    registerNotifications(handleNotificationOpen);
     registerUpdates();
     const link = deepLinkFromArguments(process.argv);
     const profileFile = profileFileFromArguments(process.argv);
+    const taildropPaths = taildropSendPaths(process.argv, process.cwd());
     const startInTray =
-      wasOpenedAtLogin() && trayEnabled() && trayInBackground() && !link && !profileFile;
+      wasOpenedAtLogin() &&
+      trayEnabled() &&
+      trayInBackground() &&
+      !link &&
+      !profileFile &&
+      taildropPaths.length === 0;
     migrateLoginItem();
     if (!startInTray) {
       createWindow();
@@ -436,6 +522,7 @@ if (!singleInstanceLock) {
     if (profileFile) {
       handleProfileFile(profileFile);
     }
+    queueTaildropSend(taildropPaths);
     void runStartupUpdateCheck(() => sendWhenLoaded(UPDATES_PRESENT, null));
   });
 }

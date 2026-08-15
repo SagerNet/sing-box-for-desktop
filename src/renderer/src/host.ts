@@ -1,27 +1,28 @@
 import { createClient } from "@connectrpc/connect";
 
+import { navigate } from "@dashboard/app/context";
 import type { DesktopHost } from "@dashboard/app/desktop";
 import { showError } from "@dashboard/app/errorStore";
 
 import { ApplicationService } from "@shared/gen/experimental/boxdd/desktop_service_pb";
+import type { TaildropSendFile } from "@shared/ipc";
 import { DesktopApi } from "./api";
 import { createIpcTransport } from "./transport";
 
 function bufferedEvent<T>(subscribe: (listener: (value: T) => void) => void) {
-  let pending: T | null = null;
+  const pending: T[] = [];
   let active: ((value: T) => void) | null = null;
   subscribe((value) => {
     if (active !== null) {
       active(value);
     } else {
-      pending = value;
+      pending.push(value);
     }
   });
   return (listener: (value: T) => void) => {
     active = listener;
-    if (pending !== null) {
-      listener(pending);
-      pending = null;
+    while (pending.length > 0) {
+      listener(pending.shift() as T);
     }
     return () => {
       if (active === listener) {
@@ -57,6 +58,11 @@ export function createDesktopHost(): DesktopHost {
   const importProfileFile = bufferedEvent<{ fileName: string; data: Uint8Array }>((listener) => {
     bridge.app.onProfileFileImport(listener);
   });
+  const taildropSendRequested = bufferedEvent<TaildropSendFile[]>((listener) => {
+    bridge.app.onTaildropSendRequested(listener);
+  });
+
+  bridge.app.onNavigate(navigate);
 
   return {
     platform: bridge.platform,
@@ -218,6 +224,7 @@ export function createDesktopHost(): DesktopHost {
       clearCache: () => bridge.settings.clearCache(),
     },
     updates: bridge.updates,
+    taildrop: bridge.taildrop,
     application: {
       shareFile: async (fileName, data) => {
         await bridge.app.shareFile(
@@ -237,5 +244,6 @@ export function createDesktopHost(): DesktopHost {
     },
     onImportRemoteProfile: (listener) => importRemoteProfile(listener),
     onImportProfileFile: (listener) => importProfileFile(listener),
+    onTaildropSendRequested: (listener) => taildropSendRequested(listener),
   };
 }

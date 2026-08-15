@@ -1,8 +1,9 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { IpcRendererEvent } from "electron";
 
 import {
   APP_CALL,
+  APP_NAVIGATE,
   APP_TITLE_BAR_OVERLAY,
   CORE_CALL,
   DAEMON_RETRY,
@@ -31,6 +32,12 @@ import {
   SERVERS_CALL,
   SETTINGS_CALL,
   SETUP_CALL,
+  TAILDROP_DOWNLOAD,
+  TAILDROP_DOWNLOAD_PROGRESS,
+  TAILDROP_SEND_CANCEL,
+  TAILDROP_SEND_EVENT,
+  TAILDROP_SEND_REQUEST,
+  TAILDROP_SEND_START,
   TERMINAL_CLIPBOARD_READ,
   TERMINAL_CLIPBOARD_WRITE,
   TERMINAL_CONTEXT_MENU,
@@ -47,6 +54,9 @@ import type {
   ProfileFileImport,
   ProfilesResult,
   StreamEvent,
+  TaildropDownloadProgress,
+  TaildropSendEvent,
+  TaildropSendFile,
   UpdatesState,
 } from "../shared/ipc";
 
@@ -276,6 +286,37 @@ const bridge: DesktopBridge = {
       };
     },
   },
+  taildrop: {
+    pathForFile: (file) => webUtils.getPathForFile(file),
+    startSend: (sessionID, request) => {
+      ipcRenderer.send(TAILDROP_SEND_START, sessionID, request);
+    },
+    cancelSend: (sessionID) => {
+      ipcRenderer.send(TAILDROP_SEND_CANCEL, sessionID);
+    },
+    onSendEvent: (listener) => {
+      const handler = (_event: IpcRendererEvent, payload: TaildropSendEvent) => listener(payload);
+      ipcRenderer.on(TAILDROP_SEND_EVENT, handler);
+      return () => {
+        ipcRenderer.removeListener(TAILDROP_SEND_EVENT, handler);
+      };
+    },
+    download: async (request) => {
+      const result = (await ipcRenderer.invoke(TAILDROP_DOWNLOAD, request)) as ProfilesResult;
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+      return result.value as boolean;
+    },
+    onDownloadProgress: (listener) => {
+      const handler = (_event: IpcRendererEvent, payload: TaildropDownloadProgress) =>
+        listener(payload);
+      ipcRenderer.on(TAILDROP_DOWNLOAD_PROGRESS, handler);
+      return () => {
+        ipcRenderer.removeListener(TAILDROP_DOWNLOAD_PROGRESS, handler);
+      };
+    },
+  },
   app: {
     version: () => callResult(APP_CALL, "version"),
     shareFile: (fileName, data) => callResult(APP_CALL, "shareFile", fileName, data),
@@ -297,6 +338,20 @@ const bridge: DesktopBridge = {
       ipcRenderer.on(PROFILE_FILE_IMPORT, handler);
       return () => {
         ipcRenderer.removeListener(PROFILE_FILE_IMPORT, handler);
+      };
+    },
+    onTaildropSendRequested: (listener) => {
+      const handler = (_event: IpcRendererEvent, files: TaildropSendFile[]) => listener(files);
+      ipcRenderer.on(TAILDROP_SEND_REQUEST, handler);
+      return () => {
+        ipcRenderer.removeListener(TAILDROP_SEND_REQUEST, handler);
+      };
+    },
+    onNavigate: (listener) => {
+      const handler = (_event: IpcRendererEvent, route: string) => listener(route);
+      ipcRenderer.on(APP_NAVIGATE, handler);
+      return () => {
+        ipcRenderer.removeListener(APP_NAVIGATE, handler);
       };
     },
   },

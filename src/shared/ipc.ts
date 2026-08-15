@@ -277,6 +277,13 @@ export const APP_CALL = "app:call";
 export const APP_TITLE_BAR_OVERLAY = "app:title-bar-overlay";
 export const DEEP_LINK_IMPORT = "app:deep-link-import";
 export const PROFILE_FILE_IMPORT = "app:profile-file-import";
+export const TAILDROP_SEND_REQUEST = "app:taildrop-send-request";
+export const APP_NAVIGATE = "app:navigate";
+export const TAILDROP_DOWNLOAD = "taildrop:download";
+export const TAILDROP_SEND_START = "taildrop:send-start";
+export const TAILDROP_SEND_CANCEL = "taildrop:send-cancel";
+export const TAILDROP_SEND_EVENT = "taildrop:send-event";
+export const TAILDROP_DOWNLOAD_PROGRESS = "taildrop:download-progress";
 
 export interface TitleBarOverlayColors {
   color: string;
@@ -362,6 +369,52 @@ export interface ProfileFileImport {
   data: Uint8Array;
 }
 
+export interface TaildropSendFile {
+  name: string;
+  size: number;
+  path: string;
+}
+
+export interface TaildropSendRequest {
+  endpointTag: string;
+  peerStableID: string;
+  files: TaildropSendFile[];
+}
+
+export type TaildropSendEvent =
+  | {
+      sessionID: number;
+      type: "progress";
+      fileIndex: number;
+      sentBytes: number;
+      fileCompleted: boolean;
+    }
+  | { sessionID: number; type: "finished"; code: number; error: string };
+
+export type TaildropDownloadAction = "save" | "open" | "share";
+
+export interface TaildropDownloadRequest {
+  downloadID: number;
+  endpointTag: string;
+  name: string;
+  action: TaildropDownloadAction;
+}
+
+export interface TaildropDownloadProgress {
+  downloadID: number;
+  transferred: number;
+  size: number;
+}
+
+export interface TaildropBridge {
+  pathForFile(file: File): string;
+  startSend(sessionID: number, request: TaildropSendRequest): void;
+  cancelSend(sessionID: number): void;
+  onSendEvent(listener: (event: TaildropSendEvent) => void): () => void;
+  download(request: TaildropDownloadRequest): Promise<boolean>;
+  onDownloadProgress(listener: (progress: TaildropDownloadProgress) => void): () => void;
+}
+
 export interface AppBridge {
   version(): Promise<string>;
   shareFile(fileName: string, data: Uint8Array): Promise<void>;
@@ -371,6 +424,8 @@ export interface AppBridge {
   setTitleBarOverlay(colors: TitleBarOverlayColors): void;
   onDeepLinkImport(listener: (request: DeepLinkImport) => void): () => void;
   onProfileFileImport(listener: (request: ProfileFileImport) => void): () => void;
+  onTaildropSendRequested(listener: (files: TaildropSendFile[]) => void): () => void;
+  onNavigate(listener: (route: string) => void): () => void;
 }
 
 export interface DesktopBridge {
@@ -387,5 +442,6 @@ export interface DesktopBridge {
   openConnectBrowser: OpenConnectBrowserBridge;
   settings: SettingsBridge;
   updates: UpdatesBridge;
+  taildrop: TaildropBridge;
   app: AppBridge;
 }

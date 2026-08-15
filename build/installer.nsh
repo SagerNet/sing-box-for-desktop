@@ -5,6 +5,7 @@ SetFont "Segoe UI" 9
 !include WinMessages.nsh
 
 !define INSTALLATION_LAYOUT_REGISTRY_KEY "Software\SagerNet\sing-box"
+!define TAILDROP_VERB_REGISTRY_KEY "Software\Classes\*\shell\Taildrop"
 
 !ifndef BUILD_UNINSTALLER
   !include StrContains.nsh
@@ -280,6 +281,12 @@ FunctionEnd
   LangString installationDirectoryLabel ${LANG_TRADCHINESE} "應用程式安裝目錄："
   LangString installationDirectoryLabel ${LANG_FARSI} "پوشهٔ نصب برنامه:"
   LangString installationDirectoryLabel ${LANG_RUSSIAN} "Каталог установки приложения:"
+
+  LangString taildropVerb ${LANG_ENGLISH} "Send with Taildrop"
+  LangString taildropVerb ${LANG_SIMPCHINESE} "使用 Taildrop 发送"
+  LangString taildropVerb ${LANG_TRADCHINESE} "使用 Taildrop 傳送"
+  LangString taildropVerb ${LANG_FARSI} "ارسال با Taildrop"
+  LangString taildropVerb ${LANG_RUSSIAN} "Отправить через Taildrop"
 
   LangString createDesktopShortcut ${LANG_ENGLISH} "Create a desktop shortcut"
   LangString createDesktopShortcut ${LANG_SIMPCHINESE} "创建桌面快捷方式"
@@ -670,6 +677,23 @@ FunctionEnd
 
 !macro daemonExecutable OUT
   StrCpy ${OUT} "$INSTDIR\resources\daemon\sing-box-daemon.exe"
+!macroend
+
+!macro registerTaildropVerb
+  !insertmacro setInstallationLayoutRegistryView
+  WriteRegStr HKLM "${TAILDROP_VERB_REGISTRY_KEY}" "" "$(taildropVerb)"
+  WriteRegStr HKLM "${TAILDROP_VERB_REGISTRY_KEY}" "Icon" "$appExe,0"
+  WriteRegStr HKLM "${TAILDROP_VERB_REGISTRY_KEY}" "MultiSelectModel" "Player"
+  WriteRegStr HKLM "${TAILDROP_VERB_REGISTRY_KEY}\command" "" '"$appExe" --taildrop-send="%1"'
+  !insertmacro restoreInstallerRegistryView
+  System::Call 'shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
+!macroend
+
+!macro unregisterTaildropVerb
+  !insertmacro setInstallationLayoutRegistryView
+  DeleteRegKey HKLM "${TAILDROP_VERB_REGISTRY_KEY}"
+  !insertmacro restoreInstallerRegistryView
+  System::Call 'shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
 !macroend
 
 !macro refreshDesktopShortcutIfPresent NEW_LINK OLD_LINK REFRESHED
@@ -1687,6 +1711,7 @@ FunctionEnd
   ${endif}
   WriteRegStr HKLM "${INSTALLATION_LAYOUT_REGISTRY_KEY}" "DaemonDataDirectory" "$daemonDataDirectory"
   !insertmacro restoreInstallerRegistryView
+  !insertmacro registerTaildropVerb
   ${if} $dataMigrationPrepared == 1
     DetailPrint "$(completingDataMigration)"
   ${endif}
@@ -1831,6 +1856,7 @@ FunctionEnd
         Abort "$(removeServiceFailed)"
       ${endif}
     ${endif}
+    !insertmacro unregisterTaildropVerb
     ${if} $keepUninstallData == ${BST_UNCHECKED}
       DetailPrint "$(removingData)"
       nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\installer-preflight.ps1" -InstallationDirectory "$INSTDIR" -ApplicationDataDirectory "$applicationDataDirectory" -DaemonWorkingDirectory "$daemonDataDirectory" -InstallationID "$installationID" -AllowUnsafeInstallationDirectory -DeleteDataDirectories'

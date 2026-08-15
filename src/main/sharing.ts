@@ -48,12 +48,12 @@ function windowsShareModulePath(): string {
       );
 }
 
-function sharedFileName(fileName: string): string {
+export function safeFileName(fileName: string): string {
   let name = fileName
     .replace(/[\u0000-\u001f<>:"/\\|?*]/gu, "_")
     .replace(/[ .]+$/u, "");
   if (name.length === 0) {
-    return "shared-file";
+    return "file";
   }
   const baseName = name.split(".", 1)[0];
   if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/iu.test(baseName)) {
@@ -71,29 +71,33 @@ function sharedFileName(fileName: string): string {
     characters.pop();
     stem = characters.join("").replace(/[ .]+$/u, "");
   }
-  return stem.length === 0 ? "shared-file" : stem + extension;
+  return stem.length === 0 ? "file" : stem + extension;
 }
 
-function scheduleRemoval(directory: string) {
+export function scheduleTemporaryRemoval(directory: string) {
   const timer = setTimeout(() => {
     void rm(directory, { recursive: true, force: true });
   }, 10 * 60 * 1000);
   timer.unref();
 }
 
-export async function shareFile(window: BrowserWindow, fileName: string, data: Uint8Array) {
+export async function shareFilePath(window: BrowserWindow, path: string, title: string) {
   if (process.platform !== "win32") {
     throw new Error("sharing files is only supported on Windows");
   }
-  const name = sharedFileName(fileName);
+  await windowsShareModule().shareFile(nativeWindowHandle(window), path, title);
+}
+
+export async function shareFile(window: BrowserWindow, fileName: string, data: Uint8Array) {
+  const name = safeFileName(fileName);
   const directory = await mkdtemp(join(tmpdir(), "sing-box-share-"));
   const path = join(directory, name);
   try {
     await writeFile(path, Buffer.from(data), { mode: 0o600 });
-    await windowsShareModule().shareFile(nativeWindowHandle(window), path, name);
+    await shareFilePath(window, path, name);
   } catch (error) {
     await rm(directory, { recursive: true, force: true }).catch(() => undefined);
     throw error;
   }
-  scheduleRemoval(directory);
+  scheduleTemporaryRemoval(directory);
 }
