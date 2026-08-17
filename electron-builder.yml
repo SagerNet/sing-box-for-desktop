@@ -60,6 +60,16 @@ win:
         - libcronet.dll
         - WinDivert64.sys
         - WinDivert32.sys
+        - VBoxUSB.sys
+        - VBoxUSB.inf
+        - VBoxUSB.cat
+        - VBoxUSBMon.sys
+        - usbip2_ude.sys
+        - usbip2_ude.inf
+        - usbip2_ude.cat
+        - usbip2_filter.sys
+        - usbip2_filter.inf
+        - usbip2_filter.cat
     - from: bin/windows/${arch}/windows_share.node
       to: native/windows_share.node
   target:

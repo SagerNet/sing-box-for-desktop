@@ -329,6 +329,7 @@ const windowsArchitectures = [
     portableExecutableMachine: 0x8664,
     includesCronet: true,
     winDivertDriver: "WinDivert64.sys",
+    includesUSBIPDrivers: true,
   },
   {
     goArchitecture: "386",
@@ -338,6 +339,7 @@ const windowsArchitectures = [
     portableExecutableMachine: 0x014c,
     includesCronet: false,
     winDivertDriver: "WinDivert32.sys",
+    includesUSBIPDrivers: false,
   },
   {
     goArchitecture: "arm64",
@@ -347,6 +349,7 @@ const windowsArchitectures = [
     portableExecutableMachine: 0xaa64,
     includesCronet: true,
     winDivertDriver: null,
+    includesUSBIPDrivers: true,
   },
 ] as const;
 
@@ -363,6 +366,14 @@ async function packageWindowsArchitecture(artifactArchitecture: string) {
   }
   if (architecture.winDivertDriver !== null) {
     stagedPaths.push(architecture.winDivertDriver);
+  }
+  if (architecture.includesUSBIPDrivers) {
+    stagedPaths.push(
+      "VBoxUSB.sys",
+      "VBoxUSBMon.sys",
+      "usbip2_ude.sys",
+      "usbip2_filter.sys",
+    );
   }
   for (const stagedPath of stagedPaths) {
     verifyPortableExecutableArchitecture(
