@@ -21,6 +21,7 @@ import type {
 import { applicationCacheDirectory } from "./appCache";
 import { parseBooleanPreference, Preference } from "./database";
 import { desktopService } from "./daemon";
+import { userAgent } from "./userAgent";
 
 const RELEASES_URL = "https://api.github.com/repos/SagerNet/sing-box/releases";
 const RELEASES_PER_PAGE = 100;
@@ -206,7 +207,7 @@ async function fetchReleases(track: UpdateTrack, githubToken: string): Promise<G
   const releases: GitHubRelease[] = [];
   const headers = new Headers({
     "Accept": "application/vnd.github+json",
-    "User-Agent": `sing-box/${__APP_VERSION__}`,
+    "User-Agent": userAgent(),
   });
   const token = githubToken.trim();
   if (token !== "") {
@@ -337,7 +338,7 @@ async function downloadUpdate(info: AppUpdateInfo): Promise<string> {
   await rm(destination, { force: true });
 
   const response = await fetch(info.downloadURL, {
-    headers: { "User-Agent": `sing-box/${__APP_VERSION__}` },
+    headers: { "User-Agent": userAgent() },
   });
   if (!response.ok || response.body === null) {
     throw new Error(`download update: HTTP ${response.status}`);

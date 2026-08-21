@@ -18,6 +18,7 @@ import { writeApplicationCacheFile } from "./appCache";
 import { desktopService } from "./daemon";
 import { Preference, settingsDatabase } from "./database";
 import { oomStartOptions } from "./settings";
+import { userAgent } from "./userAgent";
 import { applicationService } from "./worker";
 import { daemonState } from "./state";
 
@@ -203,7 +204,7 @@ async function readLimitedResponse(
 // HTTP 200, reporting other statuses as "HTTP <Status>: <body>".
 async function fetchRemoteContent(remoteUrl: string): Promise<string> {
   const requestUrl = new URL(remoteUrl);
-  const headers = new Headers({ "User-Agent": `sing-box/${__APP_VERSION__}` });
+  const headers = new Headers({ "User-Agent": userAgent() });
   if (requestUrl.username !== "" || requestUrl.password !== "") {
     const credentials = `${decodeURIComponent(requestUrl.username)}:${decodeURIComponent(requestUrl.password)}`;
     headers.set(
