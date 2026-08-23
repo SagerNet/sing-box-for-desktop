@@ -17,7 +17,7 @@ import type {
 import { writeApplicationCacheFile } from "./appCache";
 import { desktopService } from "./daemon";
 import { Preference, settingsDatabase } from "./database";
-import { oomStartOptions } from "./settings";
+import { serviceStartOptions } from "./settings";
 import { userAgent } from "./userAgent";
 import { applicationService } from "./worker";
 import { daemonState } from "./state";
@@ -335,7 +335,7 @@ async function startServiceWithContent(content: string): Promise<void> {
   }
   await desktopService.startService({
     configContent: content,
-    options: await oomStartOptions(),
+    options: await serviceStartOptions(),
   });
 }
 

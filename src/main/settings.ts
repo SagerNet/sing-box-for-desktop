@@ -42,6 +42,11 @@ const oomKillerKillConnectionsPreference = new Preference(
   false,
   parseBooleanPreference,
 );
+const powerReportEnabledPreference = new Preference(
+  "power_report_enabled",
+  false,
+  parseBooleanPreference,
+);
 const trayEnabledPreference = new Preference("tray_enabled", true, parseBooleanPreference);
 const trayInBackgroundPreference = new Preference(
   "tray_in_background",
@@ -73,15 +78,17 @@ export async function saveMainWindowState(state: MainWindowState): Promise<void>
   mainWindowStatePreference.set({ ...state });
 }
 
-export async function oomStartOptions(): Promise<{
+export async function serviceStartOptions(): Promise<{
   oomKillerEnabled: boolean;
   oomKillerDisabled: boolean;
   oomMemoryLimit: bigint;
+  powerReportEnabled: boolean;
 }> {
   return {
     oomKillerEnabled: oomKillerEnabledPreference.get(),
     oomKillerDisabled: !oomKillerKillConnectionsPreference.get(),
     oomMemoryLimit: BigInt(oomMemoryLimitPreference.get()) * 1024n * 1024n,
+    powerReportEnabled: powerReportEnabledPreference.get(),
   };
 }
 
@@ -95,6 +102,7 @@ const handlers: Record<string, (...callArguments: never[]) => Promise<unknown>> 
       oomKillerEnabled: oomKillerEnabledPreference.get(),
       oomMemoryLimitMB: oomMemoryLimitPreference.get(),
       oomKillerKillConnections: oomKillerKillConnectionsPreference.get(),
+      powerReportEnabled: powerReportEnabledPreference.get(),
     };
   },
 
@@ -126,6 +134,10 @@ const handlers: Record<string, (...callArguments: never[]) => Promise<unknown>> 
 
   async setOOMKillerKillConnections(value: boolean): Promise<void> {
     oomKillerKillConnectionsPreference.set(parseBooleanPreference(value));
+  },
+
+  async setPowerReportEnabled(value: boolean): Promise<void> {
+    powerReportEnabledPreference.set(parseBooleanPreference(value));
   },
 
   async cacheSize(): Promise<number> {

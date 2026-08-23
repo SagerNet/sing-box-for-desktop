@@ -269,6 +269,13 @@ export interface ReportsBridge {
   oomCreateArchive(name: string, options?: CrashReportExportOptions): Promise<ReportArchive>;
   oomRemove(name: string): Promise<void>;
   oomRemoveAll(): Promise<void>;
+  powerList(): Promise<OOMReportEntry[]>;
+  powerRead(name: string): Promise<OOMReportFile[]>;
+  powerMarkRead(name: string): Promise<void>;
+  powerExportFile(name: string, options?: CrashReportExportOptions): Promise<boolean>;
+  powerCreateArchive(name: string, options?: CrashReportExportOptions): Promise<ReportArchive>;
+  powerRemove(name: string): Promise<void>;
+  powerRemoveAll(): Promise<void>;
   triggerAppCrash(type: "js" | "native"): Promise<void>;
 }
 
@@ -300,6 +307,7 @@ export interface DesktopSettings {
   oomKillerEnabled: boolean;
   oomMemoryLimitMB: number;
   oomKillerKillConnections: boolean;
+  powerReportEnabled: boolean;
 }
 
 export interface SettingsBridge {
@@ -311,6 +319,7 @@ export interface SettingsBridge {
   setOOMKillerEnabled(value: boolean): Promise<void>;
   setOOMMemoryLimitMB(value: number): Promise<void>;
   setOOMKillerKillConnections(value: boolean): Promise<void>;
+  setPowerReportEnabled(value: boolean): Promise<void>;
   cacheSize(): Promise<number>;
   clearCache(): Promise<void>;
 }

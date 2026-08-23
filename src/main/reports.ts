@@ -159,6 +159,50 @@ const handlers: Record<string, (...callArguments: never[]) => Promise<unknown>> 
   async oomRemoveAll(): Promise<void> {
     await requireDesktopService().deleteAllOOMReports({});
   },
+
+  async powerList(): Promise<OOMReportEntry[]> {
+    const result = await requireDesktopService().listPowerReports({});
+    return result.reports.map((report) => ({
+      name: report.name,
+      recordedAt: Number(report.recordedAt),
+      isRead: report.isRead,
+    }));
+  },
+
+  async powerRead(name: string): Promise<OOMReportFile[]> {
+    const result = await requireDesktopService().readPowerReport({ name });
+    const decoder = new TextDecoder();
+    return result.files.map((file) => ({
+      name: file.name,
+      content: file.isProfile ? "" : decoder.decode(file.content),
+      isProfile: file.isProfile,
+    }));
+  },
+
+  async powerMarkRead(name: string): Promise<void> {
+    await requireDesktopService().markPowerReportRead({ name });
+  },
+
+  async powerExportFile(name: string, options?: CrashReportExportOptions): Promise<boolean> {
+    const exportOptions = options ?? { withConfiguration: false, withLog: true, encrypt: false };
+    const archive = await createPowerReportArchive(name, exportOptions);
+    return saveArchive(archive.fileName, archive.data, exportOptions.encrypt);
+  },
+
+  async powerCreateArchive(name: string, options?: CrashReportExportOptions): Promise<ReportArchive> {
+    return createPowerReportArchive(
+      name,
+      options ?? { withConfiguration: false, withLog: true, encrypt: false },
+    );
+  },
+
+  async powerRemove(name: string): Promise<void> {
+    await requireDesktopService().deletePowerReport({ name });
+  },
+
+  async powerRemoveAll(): Promise<void> {
+    await requireDesktopService().deleteAllPowerReports({});
+  },
 };
 
 async function createCrashReportArchive(
@@ -174,6 +218,23 @@ async function createCrashReportArchive(
         withLog: options.withLog,
         encrypt: options.encrypt,
       });
+  return {
+    fileName: archive.fileName,
+    data: archive.data,
+    mediaType: options.encrypt ? "application/octet-stream" : "application/zip",
+  };
+}
+
+async function createPowerReportArchive(
+  name: string,
+  options: CrashReportExportOptions,
+): Promise<ReportArchive> {
+  const archive = await requireDesktopService().exportPowerReport({
+    name,
+    withConfiguration: options.withConfiguration,
+    withLog: options.withLog,
+    encrypt: options.encrypt,
+  });
   return {
     fileName: archive.fileName,
     data: archive.data,
