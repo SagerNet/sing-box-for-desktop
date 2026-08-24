@@ -72,7 +72,7 @@ function ensureTrayMenuWindow(initialBounds: Rectangle): BrowserWindow {
   return window;
 }
 
-function hideTrayMenu() {
+export function hideTrayMenu() {
   if (menuWindow === null || menuState === "closed") {
     return;
   }

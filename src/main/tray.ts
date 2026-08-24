@@ -10,8 +10,10 @@ import { onPreferenceChanged } from "./preferences";
 import { onProfilesChanged, profilesState, selectProfile, startSelectedProfile } from "./profiles";
 import { resourcePath } from "./resources";
 import { daemonState } from "./state";
-import { destroyTrayMenuWindow, prepareTrayMenuWindow, showTrayMenu } from "./trayMenu";
+import { destroyTrayMenuWindow, hideTrayMenu, prepareTrayMenuWindow, showTrayMenu } from "./trayMenu";
 import { X11Tray } from "./x11Tray";
+
+const DOUBLE_ACTIVATE_INTERVAL_MILLISECONDS = 500;
 
 let tray: Tray | null = null;
 let x11Tray: X11Tray | null = null;
@@ -183,6 +185,10 @@ function createElectronTray() {
     };
     tray.on("click", (_event, bounds) => popMenu(bounds));
     tray.on("right-click", (_event, bounds) => popMenu(bounds));
+    tray.on("double-click", () => {
+      hideTrayMenu();
+      openWindow();
+    });
     return;
   }
   rebuildTrayMenu();
@@ -208,10 +214,22 @@ export function updateTrayVisibility(enabled: boolean) {
     return;
   }
   prepareTrayMenuWindow(cursorAnchor());
+  const popMenu = (x: number, y: number) => {
+    void showTrayMenu(clickAnchor(x, y));
+  };
+  let lastActivateAt = 0;
   let currentTray: X11Tray;
   try {
-    currentTray = new X11Tray((x, y) => {
-      void showTrayMenu(clickAnchor(x, y));
+    currentTray = new X11Tray(popMenu, (x, y) => {
+      const now = Date.now();
+      if (now - lastActivateAt < DOUBLE_ACTIVATE_INTERVAL_MILLISECONDS) {
+        lastActivateAt = 0;
+        hideTrayMenu();
+        openWindow();
+        return;
+      }
+      lastActivateAt = now;
+      popMenu(x, y);
     });
   } catch (error: unknown) {
     console.error("failed to create X11 tray:", error);
