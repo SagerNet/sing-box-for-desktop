@@ -73,17 +73,9 @@ const lastShownUpdateVersionPreference = new Preference(
   "",
   parseString,
 );
-const stableTrackAvailablePreference = new Preference(
-  "stable_track_available",
-  false,
-  parseBooleanPreference,
-);
 const githubTokenPreference = new Preference("github_token", "", parseString);
 
 function currentTrack(): UpdateTrack {
-  if (!stableTrackAvailablePreference.get()) {
-    return "beta";
-  }
   return updateTrackPreference.get();
 }
 
@@ -99,7 +91,6 @@ function updatesState(): UpdatesState {
   return {
     supported: UPDATES_SUPPORTED,
     track: currentTrack(),
-    stableTrackAvailable: stableTrackAvailablePreference.get(),
     checkUpdateEnabled: checkUpdateEnabledPreference.get(),
     prompted: updateCheckPromptedPreference.get(),
     info: runtime.info,
@@ -273,9 +264,6 @@ async function checkForUpdate(): Promise<AppUpdateInfo | null> {
       const asset = findWindowsAsset(release.assets);
       if (asset === null) {
         continue;
-      }
-      if (!release.prerelease && !stableTrackAvailablePreference.get()) {
-        stableTrackAvailablePreference.set(true);
       }
       if (track === "stable" && release.prerelease) {
         continue;
@@ -504,9 +492,6 @@ const handlers: Record<string, (...callArguments: never[]) => Promise<unknown>> 
   installWithElevation,
 
   async setTrack(track: UpdateTrack): Promise<void> {
-    if (!stableTrackAvailablePreference.get()) {
-      throw new Error("track selection is not available");
-    }
     const parsed = parseUpdateTrack(track);
     updateTrackPreference.set(parsed);
     if (runtime.info !== null && parsed === "stable" && runtime.info.isPrerelease) {

@@ -343,7 +343,6 @@ export interface AppUpdateInfo {
 export interface UpdatesState {
   supported: boolean;
   track: UpdateTrack;
-  stableTrackAvailable: boolean;
   checkUpdateEnabled: boolean;
   prompted: boolean;
   info: AppUpdateInfo | null;
