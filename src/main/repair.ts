@@ -109,7 +109,6 @@ function windowsCommandLineQuote(value: string): string {
 }
 
 const PKEXEC_EXIT_CODE_CANCELLED = 126;
-const PKEXEC_EXIT_CODE_NOT_AUTHORIZED = 127;
 
 function runElevatedLinux(commandArguments: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -117,7 +116,7 @@ function runElevatedLinux(commandArguments: string[]): Promise<number> {
       "pkexec",
       [daemonBinaryPath(), ...commandArguments],
       { timeout: 120000 },
-      (error) => {
+      (error, _stdout, stderr) => {
         if (error && typeof error.code !== "number") {
           if (error.code === "ENOENT") {
             resolve(EXIT_CODE_LAUNCH_FAILED);
@@ -131,11 +130,16 @@ function runElevatedLinux(commandArguments: string[]): Promise<number> {
           return;
         }
         const exitCode = error.code as number;
-        if (
-          exitCode === PKEXEC_EXIT_CODE_CANCELLED ||
-          exitCode === PKEXEC_EXIT_CODE_NOT_AUTHORIZED
-        ) {
+        if (exitCode === PKEXEC_EXIT_CODE_CANCELLED) {
           resolve(EXIT_CODE_CANCELLED);
+          return;
+        }
+        const message = stderr
+          .split("\n")
+          .map((line) => line.trim())
+          .find((line) => line !== "");
+        if (message !== undefined) {
+          reject(new Error(message));
           return;
         }
         resolve(exitCode);
