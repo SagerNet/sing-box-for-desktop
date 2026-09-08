@@ -35,14 +35,14 @@ async function setInsecureModeEnabled(enabled: boolean): Promise<void> {
   if (typeof enabled !== "boolean") {
     throw new Error("invalid insecure mode setting");
   }
-  if (enabled) {
+  if (enabled && process.platform === "win32") {
     await runElevatedServiceCommand(["service", "set-insecure-mode", "true"]);
     return;
   }
   if (desktopService === null) {
     throw new Error("daemon is not available");
   }
-  await desktopService.setInsecureModeEnabled({ enabled: false });
+  await desktopService.setInsecureModeEnabled({ enabled });
 }
 
 async function workingDirectory(): Promise<WorkingDirectoryInfo> {
