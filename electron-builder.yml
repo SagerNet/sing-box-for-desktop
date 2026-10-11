@@ -120,6 +120,8 @@ linux:
       to: trayStopped@2x.png
     - from: bin/sing-box-daemon
       to: daemon/sing-box-daemon
+    - from: bin/linux/${arch}/wayland_menu.node
+      to: native/wayland_menu.node
   desktop:
     entry:
       StartupWMClass: sing-box
